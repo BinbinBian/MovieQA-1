@@ -5,6 +5,11 @@ import skipthoughts
 from tqdm import tqdm
 import hickle
 import threading
+import pickle
+import word2vec
+from nltk.tokenize import sent_tokenize
+from nltk.tokenize import word_tokenize
+
 
 model = skipthoughts.load_model()
 
@@ -50,13 +55,88 @@ class Dataset(object):
 
         data_sets = DataSets()
 
+        if embedding_method == 'word2vec':
+            model = 'word2vec.ckpt'
+            for qa_info in qa:
+                """ ==================================================
+                getting basic factor of dataset."""
+                question = str(qa_info.question).split()
+                answers = [str(answer) for answer in qa_info.answers]
+                correct_index = qa_info.correct_index
+                imdb_key = str(qa_info.imdb_key)
+                stories = self.story[imdb_key]
+                error = False
+                imdb_key_check = dict()
+                validation_flag = str(qa_info.qid)
+                """================================================="""
+
+                question_embedding = word2vec.encode(model, quesiton) # word2vec embedding : question
+                for answer in answers:
+                    if len(answer) == 0: error = True
+                if error == True: continue
+                local_answers = [word2vec.encode(model,answer) for answer in answers] # word2vec embedding : answer
+                gt = [0.0] * 5
+                gt[correct_index] = 1.0
+
+                local_stories = []
+                if imdb_key in imdb_key_check: last_stories
+                else:
+                    imdb_key_check[imdb_key] = 1
+                    for paragraph in stories:
+                        paragraph_tokenize = sent_tokenize(paragraph)
+                        for sentences in paragraph_tokenize:
+                            local_stories.append(word2vec.encode(model, sentences)) # word2vec embedding : story
+
+            w2v_dim = 300
+            if validation_flag.find('train') != -1:
+                self.zq.append(question_embedding.reshape((w2v_dim)))
+                self.zaj.append(np.transpose(np.array(local_answers).reshape(5, w2v_dim)))
+                self.ground_truth.append(np.array(gt))
+                zsl_row = np.array(local_stories).shape[0]
+                print "zsl shape >> ",
+                print np.array(local_stories).shape
+                self.zsl.append(np.transpose(np.array(local_stories).reshpae(zsl_row, w2v_dim)))
+
+            if validation_flag.find('val') != -1:
+                self.zq_val.append(question_embedding.reshape((w2v_dim)))
+                self.zaj_val.append(np.transpose(np.array(local_answers).reshape(5, w2v_dim)))
+                self.ground_truth_val.append(np.array(gt))
+                zsl_row = np.array(local_stories).shape[0]
+                print "zsl shape >> ",
+                print np.array(local_stories).shape
+                self.zsl_val.append(np.transpose(np.array(local_stories).reshape(zsl_row, w2v_dim)))
+
+
+
+            print "==============================================="
+            print "each QAInfo status >> "
+            print "question embedding shape >> ",
+            print np.array(self.zq_val).shape
+            print "answer embedding shape >> ",
+            print np.array(self.zaj_val).shape
+            print "stories embedding shape >> ",
+            try:
+                print np.array(self.zsl_val).shape
+            except:
+                print "warning : dimension error."
+
+            print "ground truth shape >> ",
+            print np.array(self.ground_truth_val).shape
+            print "================================================"
+
+
+
+
+
+
         if embedding_method == 'skipthoughts':
             def embedding_thread(a, b):
                 imdb_key_check = {}
                 last_stories = []
                 for i in tqdm(xrange(a,b)):
                     error = False
-                    if i == 100 : break
+                    #if i == 100 : break
+
                     qa_info = self.qa[i]
                     question = str(qa_info.question)
                     answers = qa_info.answers
@@ -68,7 +148,8 @@ class Dataset(object):
                     assert question_embedding.shape == (1,4800)
 
                     for answer in answers:
-                        if len(answer) == 0 : continue
+                        if len(answer) == 0 : error = True
+                    if error == True :continue
                     local_answers = [skipthoughts.encode(model, [str(answer)]) for answer in answers]
 
                     gt = [0.0] * 5
@@ -85,19 +166,22 @@ class Dataset(object):
                         local_stories = [skipthoughts.encode(model, [str(s)])  for s in stories]
                         last_stories = local_stories
 
+                    skip_dim = 4800
                     if validation_flag.find('train') != - 1:
-                        self.zq.append(question_embedding.reshape((4800)))
-                        self.zaj.append(np.transpose(np.array(local_answers).reshape(5,4800)))
+                        self.zq.append(question_embedding.reshape((skip_dim)))
+                        self.zaj.append(np.transpose(np.array(local_answers).reshape(5,skip_dim)))
                         self.ground_truth.append(np.array(gt))
                         zsl_row = np.array(local_stories).shape[0]
-                        self.zsl.append(np.transpose(np.array(local_stories).reshape(zsl_row,4800)))
+                        print "zsl shape >> ",
+                        print np.array(local_stories).shape
+                        self.zsl.append(np.transpose(np.array(local_stories).reshape(zsl_row, skip_dim)))
 
                     elif validation_flag.find('val') != -1:
-                        self.zq_val.append(question_embedding.reshape((4800)))
-                        self.zaj_val.append(np.transpose(np.array(local_answers).reshape(5,4800)))
+                        self.zq_val.append(question_embedding.reshape((skip_dim)))
+                        self.zaj_val.append(np.transpose(np.array(local_answers).reshape(5,skip_dim)))
                         self.ground_truth_val.append(np.array(gt))
                         zsl_row = np.array(local_stories).shape[0]
-                        self.zsl_val.append(np.transpose(np.array(local_stories).reshape(zsl_row,4800)))
+                        self.zsl_val.append(np.transpose(np.array(local_stories).reshape(zsl_row,skip_dim)))
 
 
 
@@ -105,13 +189,17 @@ class Dataset(object):
                     print "==========================="
                     print "each QAInfo status >> "
                     print "question embedding shape >> ",
-                    print np.array(self.zq).shape
+                    print np.array(self.zq_val).shape
                     print "answer embedding shape >> ",
-                    print np.array(self.zaj).shape
+                    print np.array(self.zaj_val).shape
                     print "stories embedding shape >> ",
-                    print np.array(self.zsl).shape
+                    try:
+                        print np.array(self.zsl_val).shape
+                    except:
+                        print "warning : dimension error."
+
                     print "ground truth shape >> ",
-                    print np.array(self.ground_truth).shape
+                    print np.array(self.ground_truth_val).shape
                     print "=========================="
 
             # This code is run by multithreading, but do not scale well..
@@ -127,24 +215,23 @@ class Dataset(object):
             embedding_thread(0, len(self.qa))
 
 
-            skipthoughts_dict = {}
+            skipthoughts_dict = dict()
             skipthoughts_dict['zq_train'] = np.array(self.zq)
             skipthoughts_dict['zaj_train'] = np.array(self.zaj)
-            skipthoughts_dict['zsl_train'] = np.array(self.zsl)
+            skipthoughts_dict['zsl_train'] = self.zsl
             skipthoughts_dict['ground_truth_train'] = np.array(self.ground_truth)
 
             skipthoughts_dict['zq_val'] = np.array(self.zq_val)
             skipthoughts_dict['zaj_val'] = np.array(self.zaj_val)
-            skipthoughts_dict['zsl_val'] = np.array(self.zsl_val)
+            skipthoughts_dict['zsl_val'] = self.zsl_val
             skipthoughts_dict['zsl_ground_truth'] = np.array(self.ground_truth_val)
 
-            hickle.dump(skipthoughts_dict, './hickle_dump/skipthoughts.hkl')
 
-            self.num_train_examples = self.zq.shape[0]
-            self.num_val_examples = self.zq_val.shape[0]
+            self.num_train_examples = np.array(self.zq).shape[0]
+            self.num_val_examples = np.array(self.zq_val).shape[0]
 
-        elif embedding_method == 'word2vec':
-            pass
+            return skipthoughts_dict
+
 
     def next_batch(self, batch_size, type = 'train'):
         """ at training phase, getting training(or validation) data of predefined batch size.
